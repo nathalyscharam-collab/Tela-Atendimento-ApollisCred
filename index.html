@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tela de Atendimento - Supabase</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 0; }
+  header { background: #007bff; color: #fff; text-align: center; padding: 20px 0; font-size: 24px; }
+  .container { max-width: 1000px; margin: 20px auto; padding: 20px; background: #fff; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+  .form-group { margin-bottom: 15px; }
+  label { display: block; font-weight: bold; margin-bottom: 5px; }
+  input, select, button { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px; }
+  button { background: #007bff; color: #fff; border: none; cursor: pointer; transition: 0.3s; }
+  button:hover { background: #0056b3; }
+  .hidden { display: none; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { padding: 10px; border: 1px solid #ddd; text-align: center; }
+  th { background: #007bff; color: #fff; cursor: pointer; }
+  tr:nth-child(even) { background: #f9f9f9; }
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .filters select, .filters input { width: auto; flex: 1; }
+</style>
+</head>
+<body>
+
+<header>Tela de Atendimento</header>
+
+<!-- Página do Formulário -->
+<div id="formPage" class="container">
+  <h2>Novo Atendimento</h2>
+  <div class="form-group"><label>Nome do Cliente</label><input type="text" id="nome"></div>
+  <div class="form-group"><label>Telefone do Cliente</label><input type="text" id="telefone"></div>
+  <div class="form-group"><label>CPF</label><input type="text" id="cpf"></div>
+  <div class="form-group"><label>Benefício Liberado</label><input type="text" id="beneficio"></div>
+  <div class="form-group"><label>Valor Liberado (R$)</label><input type="number" id="valor"></div>
+  <div class="form-group"><label>Parcelas</label><input type="number" id="parcelas"></div>
+  <div class="form-group"><label>Status da Conversa</label>
+    <select id="status">
+      <option>Em andamento</option>
+      <option>Finalizado</option>
+      <option>Pendente</option>
+      <option>Sem contato</option>
+    </select>
+  </div>
+  <div class="form-group"><label>Consultor Responsável</label><input type="text" id="consultor"></div>
+  <button onclick="salvarEAvancar()">Avançar</button>
+</div>
+
+<!-- Página da Tabela -->
+<div id="tablePage" class="container hidden">
+  <h2>Atendimentos</h2>
+  <div class="filters">
+    <input type="text" id="search" placeholder="Pesquisar por Nome ou CPF" oninput="filtrarTabela()">
+    <select id="filterBeneficio" onchange="filtrarTabela()">
+      <option value="">Todos os Benefícios</option>
+    </select>
+    <select id="filterConsultor" onchange="filtrarTabela()">
+      <option value="">Todos os Consultores</option>
+    </select>
+    <select id="filterStatus" onchange="filtrarTabela()">
+      <option value="">Todos os Status</option>
+    </select>
+  </div>
+  <table id="tabela">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Telefone</th>
+        <th>CPF</th>
+        <th>Benefício</th>
+        <th>Valor (R$)</th>
+        <th>Parcelas</th>
+        <th>Status</th>
+        <th>Consultor</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+
+const SUPABASE_URL = 'https://gezmqvigancqhcpevozd.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdlem1xdmlnYW5jcWhjcGV2b3pkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MDI3OTUsImV4cCI6MjA3MjQ3ODc5NX0.4OKMFIz-YWIEIe46_1ZYnDisHSA-4jr-Cnd50zAZ3ug'
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+let atendimentos = []
+
+async function carregarAtendimentos() {
+  const { data, error } = await supabase.from('atendimentos').select('*').order('created_at', { ascending: false })
+  if (error) return console.error(error)
+  atendimentos = data || []
+  popularTabela(atendimentos)
+  popularFiltros(atendimentos)
+}
+
+function popularTabela(data) {
+  const tbody = document.querySelector('#tabela tbody')
+  tbody.innerHTML = ''
+  data.forEach(a => {
+    const tr = document.createElement('tr')
+    tr.innerHTML = `
+      <td>${a.nome}</td>
+      <td>${a.telefone||''}</td>
+      <td>${a.cpf||''}</td>
+      <td>${a.beneficio||''}</td>
+      <td>${a.valor||''}</td>
+      <td>${a.parcelas||''}</td>
+      <td>${a.status||''}</td>
+      <td>${a.consultor||''}</td>`
+    tbody.appendChild(tr)
+  })
+}
+
+function popularFiltros(data) {
+  const beneficioSet = new Set(), consultorSet = new Set(), statusSet = new Set()
+  data.forEach(a=>{ beneficioSet.add(a.beneficio); consultorSet.add(a.consultor); statusSet.add(a.status) })
+  const selectBenef = document.getElementById('filterBeneficio')
+  const selectCons = document.getElementById('filterConsultor')
+  const selectStat = document.getElementById('filterStatus')
+  selectBenef.innerHTML = '<option value="">Todos os Benefícios</option>' + Array.from(beneficioSet).map(v=>`<option value="${v}">${v}</option>`).join('')
+  selectCons.innerHTML = '<option value="">Todos os Consultores</option>' + Array.from(consultorSet).map(v=>`<option value="${v}">${v}</option>`).join('')
+  selectStat.innerHTML = '<option value="">Todos os Status</option>' + Array.from(statusSet).map(v=>`<option value="${v}">${v}</option>`).join('')
+}
+
+function filtrarTabela() {
+  const search = document.getElementById('search').value.toLowerCase()
+  const filterBenef = document.getElementById('filterBeneficio').value
+  const filterConsultor = document.getElementById('filterConsultor').value
+  const filterStatus = document.getElementById('filterStatus').value
+  const filtrado = atendimentos.filter(a=>{
+    const matchSearch = a.nome.toLowerCase().includes(search) || a.cpf.includes(search)
+    const matchBenef = filterBenef === '' || a.beneficio === filterBenef
+    const matchCons = filterConsultor === '' || a.consultor === filterConsultor
+    const matchStat = filterStatus === '' || a.status === filterStat
+    return matchSearch && matchBenef && matchCons && matchStat
+  })
+  popularTabela(filtrado)
+}
+
+async function salvarEAvancar() {
+  const atendimento = {
+    nome: document.getElementById('nome').value,
+    telefone: document.getElementById('telefone').value,
+    cpf: document.getElementById('cpf').value,
+    beneficio: document.getElementById('beneficio').value,
+    valor: parseFloat(document.getElementById('valor').value || 0),
+    parcelas: parseInt(document.getElementById('parcelas').value || 0),
+    status: document.getElementById('status').value,
+    consultor: document.getElementById('consultor').value
+  }
+  if (!atendimento.nome || !atendimento.cpf) return alert('Preencha nome e CPF')
+  const { error } = await supabase.from('atendimentos').insert([atendimento])
+  if (error) return alert('Erro ao salvar: ' + error.message)
+  document.getElementById('formPage').classList.add('hidden')
+  document.getElementById('tablePage').classList.remove('hidden')
+  carregarAtendimentos()
+}
+</script>
+
+</body>
+</html>
